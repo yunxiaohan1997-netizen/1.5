@@ -202,7 +202,7 @@ async def run_round(request: RoundRequest):
         # Clear processing flag
         sim['is_processing'] = False
         
-        # Return response with sorted history
+        # Return response (without full history to avoid frontend issues)
         return {
             "round": current_round,
             "am_decision": {
@@ -213,9 +213,7 @@ async def run_round(request: RoundRequest):
                 "investment": mc_decision.investment,
                 "reasoning_steps": [step.dict() for step in mc_decision.reasoning_steps]
             },
-            "outcomes": outcomes,
-            "history": sorted(sim['history'], key=lambda x: x['round']),  # Return sorted history
-            "status": sim['status']
+            "outcomes": outcomes
         }
         
     except Exception as e:
