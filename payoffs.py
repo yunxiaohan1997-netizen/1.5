@@ -99,7 +99,7 @@ class PayoffMatrices:
         if not (0 <= am_investment <= 25 and 0 <= mc_investment <= 25):
             raise ValueError(f"Investments must be 0-25. Got AM={am_investment}, MC={mc_investment}")
         
-        return float(self.mc_matrix[am_investment, mc_investment])
+        return float(self.mc_matrix[mc_investment, am_investment])
     
     def calculate_round_outcomes(self, am_investment: int, mc_investment: int) -> dict:
         """
