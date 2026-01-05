@@ -47,18 +47,22 @@ class PayoffMatrices:
         Load AM and MC payoff matrices from Excel.
         
         The Excel structure:
-        - Sheet1: AM payoffs
-        - Sheet2: MC payoffs
-        - Data starts at row 4 (index 3), column 3 (index 2)
+        - Sheet1 (AM payoffs): Row labels in Col 2, Data in Cols 3-28 (26 columns for MC=0-25)
+        - Sheet2 (MC payoffs): Row labels in Col 3, Data in Cols 4-29 (26 columns for AM=0-25)
+        - Data starts at row 4 (index 3 in both sheets)
         - 26x26 matrices (0-25 engineers)
+        
+        Note: The two sheets have slightly different structures!
         """
         # Load AM matrix (Sheet1)
+        # Rows: AM investment (0-25), Columns: MC investment (0-25)
         df_am_raw = pd.read_excel(excel_path, sheet_name='Sheet1', header=None)
-        am_matrix = df_am_raw.iloc[4:30, 3:29].values.astype(float)
+        am_matrix = df_am_raw.iloc[4:30, 3:29].values.astype(float)  # 26 rows, 26 cols
         
         # Load MC matrix (Sheet2)
+        # Rows: MC investment (0-25), Columns: AM investment (0-25)
         df_mc_raw = pd.read_excel(excel_path, sheet_name='Sheet2', header=None)
-        mc_matrix = df_mc_raw.iloc[4:30, 3:29].values.astype(float)
+        mc_matrix = df_mc_raw.iloc[4:30, 4:30].values.astype(float)  # 26 rows, 26 cols
         
         return am_matrix, mc_matrix
     
@@ -99,6 +103,7 @@ class PayoffMatrices:
         if not (0 <= am_investment <= 25 and 0 <= mc_investment <= 25):
             raise ValueError(f"Investments must be 0-25. Got AM={am_investment}, MC={mc_investment}")
         
+        # IMPORTANT: MC matrix is indexed as [MC_investment, AM_investment]
         return float(self.mc_matrix[mc_investment, am_investment])
     
     def calculate_round_outcomes(self, am_investment: int, mc_investment: int) -> dict:
