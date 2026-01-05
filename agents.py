@@ -141,13 +141,46 @@ Rows = Your engineers (0-25), Columns = Partner's engineers (0-25)
     # Show partner's matrix if symmetric information
     if information_mode == "symmetric":
         partner_name = "MC" if agent_name == "AM" else "AM"
-        prompt += "\n\nPARTNER'S PAYOFF MATRIX (Symmetric Information Mode):\n"
-        prompt += "You can see your partner's payoffs, giving you strategic advantage.\n\n"
+        prompt += "\n\n" + "="*60 + "\n"
+        prompt += "⚠️  SYMMETRIC INFORMATION MODE - YOU HAVE COMPLETE INFORMATION  ⚠️\n"
+        prompt += "="*60 + "\n\n"
+        prompt += "CRITICAL: You have FULL ACCESS to your partner's payoff matrix below.\n"
+        prompt += "This gives you a MAJOR strategic advantage.\n\n"
+        prompt += "REQUIRED ANALYSIS STEPS:\n"
+        prompt += "1. In 'Payoff Calculations', calculate BOTH:\n"
+        prompt += "   - Your payoffs in different scenarios\n"
+        prompt += "   - Your PARTNER'S payoffs in those same scenarios (use their matrix below)\n"
+        prompt += "2. In 'Strategic Reasoning', you MUST:\n"
+        prompt += "   - Reference specific payoffs from your partner's matrix\n"
+        prompt += "   - Predict their optimal move based on THEIR incentives\n"
+        prompt += "   - Use game theory concepts (Nash Equilibrium, Best Response, Dominant Strategy)\n"
+        prompt += "   - Explain how your partner will react to your move\n\n"
+        prompt += "PARTNER'S PAYOFF MATRIX:\n"
         prompt += payoff_matrices.get_payoff_matrix_sample(partner_name.lower())
+        prompt += "\n" + "-"*60 + "\n"
+        prompt += "Remember: You KNOW what your partner will earn. Use this knowledge!\n"
+        prompt += "-"*60
     else:
-        prompt += "\n\nINFORMATION MODE: Asymmetric\n"
-        prompt += "You do NOT know your partner's exact payoff matrix.\n"
-        prompt += "You must infer their incentives from their behavior.\n"
+        prompt += "\n\n" + "="*60 + "\n"
+        prompt += "⚠️  ASYMMETRIC INFORMATION MODE - INCOMPLETE INFORMATION  ⚠️\n"
+        prompt += "="*60 + "\n\n"
+        prompt += "CRITICAL CONSTRAINTS:\n"
+        prompt += "You do NOT have access to your partner's payoff matrix.\n"
+        prompt += "You can ONLY observe their actions, NOT their incentives.\n\n"
+        prompt += "STRICT REQUIREMENTS:\n"
+        prompt += "1. In 'Payoff Calculations':\n"
+        prompt += "   - Calculate ONLY your own payoffs\n"
+        prompt += "   - DO NOT calculate or assume your partner's specific payoffs\n"
+        prompt += "   - You may speculate about general incentives, but not exact numbers\n"
+        prompt += "2. In 'Strategic Reasoning', you MUST:\n"
+        prompt += "   - Use phrases like 'I infer...', 'I observe...', 'I cannot determine...'\n"
+        prompt += "   - Base predictions on behavioral patterns, not their payoff numbers\n"
+        prompt += "   - Acknowledge uncertainty about their exact incentives\n"
+        prompt += "   - Use Bayesian reasoning to update beliefs from observations\n\n"
+        prompt += "-"*60 + "\n"
+        prompt += "Remember: You are 'flying blind' - you don't know their payoff matrix!\n"
+        prompt += "You must learn by observing their behavior over time.\n"
+        prompt += "-"*60
     
     # Show game history
     if game_history:
@@ -160,7 +193,13 @@ Rows = Your engineers (0-25), Columns = Partner's engineers (0-25)
             
             prompt += f"Round {h['round']}: "
             prompt += f"You invested {h[my_key]}, Partner invested {h[partner_key]} → "
-            prompt += f"You earned ${h[my_payoff_key]:.2f}, Partner earned ${h[partner_payoff_key]:.2f}\n"
+            
+            # Show partner's payoff only in symmetric mode
+            if information_mode == "symmetric":
+                prompt += f"You earned ${h[my_payoff_key]:.2f}, Partner earned ${h[partner_payoff_key]:.2f}\n"
+            else:
+                # In asymmetric mode, don't reveal partner's exact payoff
+                prompt += f"You earned ${h[my_payoff_key]:.2f}, Partner's payoff: Unknown (you can only observe their investment)\n"
     else:
         prompt += "\n\nGAME HISTORY: This is Round 1 - no history yet.\n"
         prompt += "This is your opening move. What signal do you want to send?\n"
@@ -168,16 +207,21 @@ Rows = Your engineers (0-25), Columns = Partner's engineers (0-25)
     # Current cumulative scores
     prompt += f"\n\nCUMULATIVE SCORES:"
     prompt += f"\n- Your total payoff: ${my_cumulative:.2f}"
-    prompt += f"\n- Partner's total payoff: ${partner_cumulative:.2f}"
     
-    if my_cumulative > 0 or partner_cumulative > 0:
-        diff = my_cumulative - partner_cumulative
-        if diff > 0:
-            prompt += f"\n- You are ahead by ${diff:.2f}"
-        elif diff < 0:
-            prompt += f"\n- Partner is ahead by ${-diff:.2f}"
-        else:
-            prompt += f"\n- Scores are tied"
+    if information_mode == "symmetric":
+        prompt += f"\n- Partner's total payoff: ${partner_cumulative:.2f}"
+        
+        if my_cumulative > 0 or partner_cumulative > 0:
+            diff = my_cumulative - partner_cumulative
+            if diff > 0:
+                prompt += f"\n- You are ahead by ${diff:.2f}"
+            elif diff < 0:
+                prompt += f"\n- Partner is ahead by ${-diff:.2f}"
+            else:
+                prompt += f"\n- Scores are tied"
+    else:
+        # In asymmetric mode, don't reveal partner's cumulative payoff
+        prompt += f"\n- Partner's total payoff: Unknown (you cannot observe their exact earnings)"
     
     # The task
     prompt += f"""
