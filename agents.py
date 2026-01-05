@@ -345,34 +345,51 @@ async def chat_with_agent(
     my_key = agent_name.lower()
     partner_key = 'mc' if agent_name == 'AM' else 'am'
     
-    my_last_investment = None
-    partner_last_investment = None
     my_cumulative = game_state.get(f'{my_key}_cumulative', 0)
     partner_cumulative = game_state.get(f'{partner_key}_cumulative', 0)
     
+    # Build complete history context
+    history_context = ""
+    if history:
+        history_context = "Complete game history:\n"
+        for round_data in history:
+            round_num = round_data.get('round', 0)
+            my_inv = round_data.get(f'{my_key}_investment', 'N/A')
+            partner_inv = round_data.get(f'{partner_key}_investment', 'N/A')
+            my_payoff = round_data.get(f'{my_key}_payoff', 0)
+            partner_payoff = round_data.get(f'{partner_key}_payoff', 0)
+            history_context += f"Round {round_num}: You invested {my_inv}, Partner invested {partner_inv} | Your payoff: ${my_payoff:.2f}, Partner payoff: ${partner_payoff:.2f}\n"
+    else:
+        history_context = "No rounds completed yet."
+    
+    # Get last round data
+    my_last_investment = None
+    partner_last_investment = None
     if history:
         last_round = history[-1]
         my_last_investment = last_round.get(f'{my_key}_investment')
         partner_last_investment = last_round.get(f'{partner_key}_investment')
     
-    # Build chat context
+    # Build chat context with complete history
     system_prompt = f"""You are a senior executive at {company_name} participating in a strategic alliance negotiation for autonomous vehicle development.
 
 CRITICAL: Stay in character. You are NOT an AI assistant. You are a business executive with strategic responsibilities.
 
-Current game situation:
+{history_context}
+
+Current situation:
 - Current round: {current_round}
-- Your last investment: {my_last_investment if my_last_investment is not None else 'N/A'} engineers
-- Partner's last investment: {partner_last_investment if partner_last_investment is not None else 'N/A'} engineers  
+- Your last investment: {my_last_investment if my_last_investment is not None else 'Not started'} engineers
+- Partner's last investment: {partner_last_investment if partner_last_investment is not None else 'Not started'} engineers  
 - Your cumulative payoff: ${my_cumulative:.2f}
 - Partner's cumulative payoff: ${partner_cumulative:.2f}
 
 When responding:
+- Reference SPECIFIC round numbers and investments when asked
 - Use business and strategy terminology
-- Reference specific numbers from the game situation
-- Explain using game theory concepts (Nash equilibrium, dominant strategies, prisoner's dilemma, etc.)
-- Show strategic sophistication - you understand game theory
-- Be direct and professional, not chatty
+- Explain using game theory concepts (Nash equilibrium, dominant strategies, repeated games)
+- Show strategic sophistication and deep analysis
+- Be direct and professional
 - Keep responses under 150 words
 - Do NOT break character or mention being an AI
 """
