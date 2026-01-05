@@ -90,6 +90,7 @@ async def start_simulation(config: SimulationConfig):
         "am_cumulative": 0.0,
         "mc_cumulative": 0.0,
         "status": "initialized",
+        "is_processing": False,  # Prevent duplicate round execution
         "created_at": datetime.now().isoformat()
     }
     
@@ -121,16 +122,26 @@ async def run_round(request: RoundRequest):
     if sim['current_round'] >= sim['max_rounds']:
         raise HTTPException(status_code=400, detail="Simulation already complete")
     
-    # Increment round
-    sim['current_round'] += 1
-    current_round = sim['current_round']
+    # Prevent duplicate round execution
+    if sim.get('is_processing', False):
+        raise HTTPException(
+            status_code=409, 
+            detail="Round already in progress. Please wait for current round to complete."
+        )
     
-    logger.info(f"Simulation {sim_id}: Running round {current_round}/{sim['max_rounds']}")
+    # Mark as processing
+    sim['is_processing'] = True
     
-    config = sim['config']
-    
-    # Both agents make decisions (in parallel)
     try:
+        # Increment round
+        sim['current_round'] += 1
+        current_round = sim['current_round']
+        
+        logger.info(f"Simulation {sim_id}: Running round {current_round}/{sim['max_rounds']}")
+        
+        config = sim['config']
+        
+        # Both agents make decisions (in parallel)
         # AM makes decision
         am_decision = await agent_make_decision(
             agent_name="AM",
@@ -155,56 +166,63 @@ async def run_round(request: RoundRequest):
             partner_cumulative=sim['am_cumulative']
         )
         
+        # Calculate outcomes using payoff matrices
+        outcomes = payoff_matrices.calculate_round_outcomes(
+            am_investment=am_decision.investment,
+            mc_investment=mc_decision.investment
+        )
+        
+        # Update cumulative scores
+        sim['am_cumulative'] += outcomes['am_payoff']
+        sim['mc_cumulative'] += outcomes['mc_payoff']
+        
+        # Add cumulative to outcomes
+        outcomes['am_cumulative'] = round(sim['am_cumulative'], 2)
+        outcomes['mc_cumulative'] = round(sim['mc_cumulative'], 2)
+        
+        # Record this round in history
+        round_record = {
+            "round": current_round,
+            "am_investment": am_decision.investment,
+            "mc_investment": mc_decision.investment,
+            "am_payoff": outcomes['am_payoff'],
+            "mc_payoff": outcomes['mc_payoff'],
+            "total_welfare": outcomes['total_welfare'],
+            "am_reasoning": am_decision.full_reasoning,
+            "mc_reasoning": mc_decision.full_reasoning,
+            "timestamp": datetime.now().isoformat()
+        }
+        sim['history'].append(round_record)
+        
+        # Check if simulation is now complete
+        if current_round >= sim['max_rounds']:
+            sim['status'] = 'complete'
+            logger.info(f"Simulation {sim_id} complete. AM: ${sim['am_cumulative']:.2f}, MC: ${sim['mc_cumulative']:.2f}")
+        
+        # Clear processing flag
+        sim['is_processing'] = False
+        
+        # Return response with sorted history
+        return {
+            "round": current_round,
+            "am_decision": {
+                "investment": am_decision.investment,
+                "reasoning_steps": [step.dict() for step in am_decision.reasoning_steps]
+            },
+            "mc_decision": {
+                "investment": mc_decision.investment,
+                "reasoning_steps": [step.dict() for step in mc_decision.reasoning_steps]
+            },
+            "outcomes": outcomes,
+            "history": sorted(sim['history'], key=lambda x: x['round']),  # Return sorted history
+            "status": sim['status']
+        }
+        
     except Exception as e:
+        # Clear processing flag on error
+        sim['is_processing'] = False
         logger.error(f"Error in agent decision-making: {e}")
         raise HTTPException(status_code=500, detail=f"Agent decision error: {str(e)}")
-    
-    # Calculate outcomes using payoff matrices
-    outcomes = payoff_matrices.calculate_round_outcomes(
-        am_investment=am_decision.investment,
-        mc_investment=mc_decision.investment
-    )
-    
-    # Update cumulative scores
-    sim['am_cumulative'] += outcomes['am_payoff']
-    sim['mc_cumulative'] += outcomes['mc_payoff']
-    
-    # Add cumulative to outcomes
-    outcomes['am_cumulative'] = round(sim['am_cumulative'], 2)
-    outcomes['mc_cumulative'] = round(sim['mc_cumulative'], 2)
-    
-    # Record this round in history
-    round_record = {
-        "round": current_round,
-        "am_investment": am_decision.investment,
-        "mc_investment": mc_decision.investment,
-        "am_payoff": outcomes['am_payoff'],
-        "mc_payoff": outcomes['mc_payoff'],
-        "total_welfare": outcomes['total_welfare'],
-        "am_reasoning": am_decision.full_reasoning,
-        "mc_reasoning": mc_decision.full_reasoning,
-        "timestamp": datetime.now().isoformat()
-    }
-    sim['history'].append(round_record)
-    
-    # Check if simulation is now complete
-    if current_round >= sim['max_rounds']:
-        sim['status'] = 'complete'
-        logger.info(f"Simulation {sim_id} complete. AM: ${sim['am_cumulative']:.2f}, MC: ${sim['mc_cumulative']:.2f}")
-    
-    # Return response
-    return {
-        "round": current_round,
-        "am_decision": {
-            "investment": am_decision.investment,
-            "reasoning_steps": [step.dict() for step in am_decision.reasoning_steps]
-        },
-        "mc_decision": {
-            "investment": mc_decision.investment,
-            "reasoning_steps": [step.dict() for step in mc_decision.reasoning_steps]
-        },
-        "outcomes": outcomes
-    }
 
 
 @app.post("/api/chat", response_model=ChatResponse)
@@ -339,4 +357,6 @@ async def list_simulations():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    import os
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
