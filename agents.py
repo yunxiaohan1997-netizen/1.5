@@ -127,8 +127,31 @@ def build_decision_prompt(
     This prompt provides all the information the agent needs to make an informed decision.
     """
     
-    prompt = f"""You are making an investment decision for Round {current_round} of {total_rounds}.
+    # Add information mode specific role instruction at the very beginning
+    if information_mode == "symmetric":
+        prompt = f"""⚠️ CRITICAL: You are in SYMMETRIC INFORMATION MODE - You have COMPLETE knowledge of both payoff matrices.
+You are making an investment decision for Round {current_round} of {total_rounds}.
 
+As a strategic game theorist with complete information, you MUST:
+- Calculate and reference BOTH your payoffs AND your partner's payoffs
+- Use game theory concepts: Nash Equilibrium, Best Response, Dominant Strategy
+- Predict partner's move based on THEIR exact incentives (you know their matrix)
+- Base decisions on strategic analysis of complete information
+
+"""
+    else:
+        prompt = f"""⚠️ CRITICAL: You are in ASYMMETRIC INFORMATION MODE - You have INCOMPLETE information.
+You are making an investment decision for Round {current_round} of {total_rounds}.
+
+As a decision-maker with incomplete information, you MUST:
+- Calculate ONLY your own payoffs (you don't know partner's matrix)
+- Use phrases like "I infer", "I observe", "I cannot determine"
+- Predict partner's move based on behavioral observations, NOT exact incentives
+- Acknowledge uncertainty and information limitations explicitly
+
+"""
+    
+    prompt += """
 PAYOFF MATRIX (Your Net Benefit):
 This shows YOUR net benefit for each combination of investments.
 Rows = Your engineers (0-25), Columns = Partner's engineers (0-25)
@@ -159,7 +182,12 @@ Rows = Your engineers (0-25), Columns = Partner's engineers (0-25)
         prompt += payoff_matrices.get_payoff_matrix_sample(partner_name.lower())
         prompt += "\n" + "-"*60 + "\n"
         prompt += "Remember: You KNOW what your partner will earn. Use this knowledge!\n"
-        prompt += "-"*60
+        prompt += "-"*60 + "\n\n"
+        prompt += "⚠️ MANDATORY CHECKLIST - Your response MUST include:\n"
+        prompt += "□ In 'Payoff Calculations': Calculate partner's payoffs (e.g., 'Partner will earn $X if they invest Y')\n"
+        prompt += "□ In 'Strategic Reasoning': Reference partner's specific payoffs from their matrix\n"
+        prompt += "□ Use terms like 'Nash Equilibrium', 'Best Response', or 'Dominant Strategy'\n"
+        prompt += "□ Explicitly state 'Based on partner's payoff matrix...' at least once\n"
     else:
         prompt += "\n\n" + "="*60 + "\n"
         prompt += "⚠️  ASYMMETRIC INFORMATION MODE - INCOMPLETE INFORMATION  ⚠️\n"
@@ -180,7 +208,12 @@ Rows = Your engineers (0-25), Columns = Partner's engineers (0-25)
         prompt += "-"*60 + "\n"
         prompt += "Remember: You are 'flying blind' - you don't know their payoff matrix!\n"
         prompt += "You must learn by observing their behavior over time.\n"
-        prompt += "-"*60
+        prompt += "-"*60 + "\n\n"
+        prompt += "⚠️ MANDATORY CHECKLIST - Your response MUST include:\n"
+        prompt += "□ In 'Payoff Calculations': Calculate ONLY your payoffs, NOT partner's specific payoffs\n"
+        prompt += "□ In 'Strategic Reasoning': Use at least ONE phrase like 'I cannot determine', 'I infer', or 'I observe'\n"
+        prompt += "□ Explicitly acknowledge 'ASYMMETRIC INFORMATION' or 'incomplete information' at least once\n"
+        prompt += "□ DO NOT state partner's exact payoff numbers (e.g., do NOT say 'partner will earn $304')\n"
     
     # Show game history
     if game_history:
@@ -225,7 +258,6 @@ Rows = Your engineers (0-25), Columns = Partner's engineers (0-25)
     
     # The task
     prompt += f"""
-
 TASK: Decide how many engineers (0-25) to allocate for Round {current_round}.
 
 Provide your analysis following this structure:
@@ -234,16 +266,45 @@ Provide your analysis following this structure:
    - Investment trend (increasing/decreasing/stable)
    - Response to your moves
    - Cooperation level assessment
-
+"""
+    
+    # Add information-mode-specific requirements for Payoff Calculations
+    if information_mode == "symmetric":
+        prompt += """
 2. PAYOFF CALCULATIONS: Calculate expected payoffs for 3-4 different scenarios.
-   - Show the math: "If I invest X and partner invests Y → my payoff = Z"
-   - Consider optimistic, realistic, and pessimistic partner responses
+   ⚠️ MANDATORY: Since you're in SYMMETRIC INFORMATION MODE:
+   - FIRST LINE MUST SAY: "Based on partner's payoff matrix, I can calculate..."
+   - For each scenario, calculate BOTH your payoff AND partner's payoff
+   - Show the math: "If I invest X and partner invests Y → I earn $A, partner earns $B"
+   - Example format: "Optimistic: I invest 15, partner invests 15 → I earn $385 (from my matrix), partner earns $291 (from their matrix)"
 
 3. STRATEGIC REASONING: Apply game theory principles.
+   ⚠️ MANDATORY: Must include at least TWO of these terms:
+   - "Nash Equilibrium" or "Best Response" or "Dominant Strategy"
+   - FIRST LINE MUST REFERENCE: "Given my knowledge of partner's payoff matrix..."
    - What equilibrium are you targeting?
    - What signals are you sending?
    - How does this fit your overall strategy?
+"""
+    else:
+        prompt += """
+2. PAYOFF CALCULATIONS: Calculate expected payoffs for 3-4 different scenarios.
+   ⚠️ MANDATORY: Since you're in ASYMMETRIC INFORMATION MODE:
+   - FIRST LINE MUST SAY: "In asymmetric information mode, I can only calculate my own payoffs..."
+   - Calculate ONLY your payoffs, NOT partner's specific numbers
+   - Show the math: "If I invest X and partner invests Y → I earn $Z"
+   - DO NOT include partner's exact payoffs (you don't know their matrix!)
 
+3. STRATEGIC REASONING: Apply reasoning under uncertainty.
+   ⚠️ MANDATORY: Must include at least TWO of these phrases:
+   - "I cannot determine..." or "I must infer..." or "I observe..."
+   - FIRST LINE MUST ACKNOWLEDGE: "Without knowing partner's payoff matrix..."
+   - What can you infer from their behavior?
+   - What signals are you sending?
+   - How does this fit your overall strategy under incomplete information?
+"""
+    
+    prompt += """
 4. DECISION: State your investment decision clearly.
 
 5. CONFIDENCE & CONTINGENCY: How confident are you? What could change your mind?
