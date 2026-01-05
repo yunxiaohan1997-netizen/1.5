@@ -104,7 +104,7 @@ class PayoffMatrices:
             raise ValueError(f"Investments must be 0-25. Got AM={am_investment}, MC={mc_investment}")
         
         # IMPORTANT: MC matrix is indexed as [MC_investment, AM_investment]
-        return float(self.mc_matrix[mc_investment, am_investment])
+        return float(self.mc_matrix[am_investment, mc_investment])
     
     def calculate_round_outcomes(self, am_investment: int, mc_investment: int) -> dict:
         """
